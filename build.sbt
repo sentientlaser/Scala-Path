@@ -3,8 +3,8 @@ name := "TootsiFrootsiIceCream"
 version := "2.0.0"
 
 scalaVersion := "2.13.0"
-//
-// coverageEnabled := true
+
+coverageEnabled := true
 //
 // scalastyleConfig := baseDirectory.value / "project/scalastyle-config.xml"
 //
