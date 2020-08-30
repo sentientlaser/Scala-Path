@@ -12,19 +12,19 @@ class ScalaPathSeqNodeSpec extends AnyFlatSpec {
   }
 
   it should "fail when a map traversal is attempted" in {
-    assertThrows [SeqNode.CannotTraverseByMapException] {
+    assertThrows [exceptions.sequences.CannotTraverseByMapException] {
       dyn / "foo"
     }
   }
 
   it should "fail when an index is out of bounds" in {
-    assertThrows [SeqNode.IndexOutOfBoundsException] {
+    assertThrows [exceptions.sequences.IndexOutOfBoundsException] {
       dyn / -1
     }
   }
 
   it should "fail when traversal is terminated" in {
-    assertThrows [AggregateNode.CannotTerminateException] {
+    assertThrows [exceptions.aggregates.CannotTerminateException] {
       dyn !
     }
   }

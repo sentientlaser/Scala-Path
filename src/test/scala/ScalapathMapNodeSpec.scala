@@ -19,20 +19,20 @@ class ScalaPathMapNodeSpec extends AnyFlatSpec {
   }
 
   it should "fail when a non-existant member is specified" in {
-    assertThrows [MapNode.NoSuchElementException] {
+    assertThrows [exceptions.maps.NoSuchElementException] {
       dyn / "florp"
     }
   }
 
   it should "fail when a sequential traversal is specified" in {
-    assertThrows [MapNode.CannotTraverseBySeqException] {
+    assertThrows [exceptions.maps.CannotTraverseBySeqException] {
       dyn / 1
     }
   }
 
 
   it should "fail when traversal is terminated" in {
-    assertThrows [AggregateNode.CannotTerminateException] {
+    assertThrows [exceptions.aggregates.CannotTerminateException] {
       dyn !
     }
   }

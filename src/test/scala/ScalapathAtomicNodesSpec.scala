@@ -9,10 +9,10 @@ class ScalaPathAtomicNodesSpec extends AnyFlatSpec {
 
   "A ScalaPath atomic node" should "fail to traverse when a path is specified" in {
     dyn = 1
-    assertThrows [AtomicNode.CannotTraverseByMapException] {
+    assertThrows [exceptions.atoms.CannotTraverseByMapException] {
       dyn / "foo"
     }
-    assertThrows [AtomicNode.CannotTraverseBySeqException] {
+    assertThrows [exceptions.atoms.CannotTraverseBySeqException] {
       dyn / 1
     }
   }
