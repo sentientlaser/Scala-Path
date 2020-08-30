@@ -12,7 +12,7 @@ class ScalaPathComplexSpec extends AnyFlatSpec {
     "derp" -> Map(
       "herp" -> List (
         1, 2, 3, Map (
-          "first" -> List( 10, 11, 12)
+          "first" -> List( 10, 11, 12),
           "last" -> 4
         )
       ),
@@ -32,8 +32,10 @@ class ScalaPathComplexSpec extends AnyFlatSpec {
   }
 
 
-  "A ScalaPath map node" should "get the correct element of a path from map " in {
+  "A ScalaPath map node" should "get the correct element of a path from a fairly arbitrary path " in {
     assert( {dyn / "derp" / "herp" / 3 !} == 2)
   }
+
+  // TODO: issue #4
 
 }
