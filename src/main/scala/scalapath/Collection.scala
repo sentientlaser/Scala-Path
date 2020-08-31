@@ -102,22 +102,13 @@ package collection {
     def apply(i:Int):SemiStructure
     def apply():T
   }
-  //
-  // trait SemiStructureModifierOps[T] {
-  //   def assign(o:T)
-  //   final def := (o:T) = this.assign(o)
-  // }
-
-
-  // it's mixed in to everything, but it's experimental, so isolated.
-  trait SemiStructureDynamicSelect[T] extends SemiStructureSelectors[T] with Dynamic {
-      def selectDynamic(i:String) = this(i)
-  }
 
   abstract class SemiStructureNode[T](
     val rawvalue:T,
     val metadata:Metadata=None
-  ) extends SemiStructureSelectors[T] with SemiStructureDynamicSelect[T]
+  ) extends SemiStructureSelectors[T] {
+    override final def apply() = rawvalue
+  }
 
 
   import exceptions._
@@ -127,9 +118,8 @@ package collection {
     override val rawvalue:T,
     override val metadata:Metadata=None
   ) extends SemiStructureNode[T](rawvalue, metadata) {
-    override def apply(i:String) = throw exceptions.atoms.CannotTraverseByMapException(this)
-    override def apply(i:Int) = throw  exceptions.atoms.CannotTraverseBySeqException(this)
-    override def apply() = rawvalue
+    override def apply(i:String) = throw exceptions.CannotTraverseByMapException(this)
+    override def apply(i:Int) = throw  exceptions.CannotTraverseBySeqException(this)
   }
 
   case class StringNode(
@@ -175,9 +165,8 @@ package collection {
   )
   extends AggregateNode[T](rawvalue, metadata) {
 
-    override def apply(i:String) = rawvalue.getOrElse(i, throw exceptions.maps.NoSuchElementException(i, this)) // maybe I should make this handle options
-    override def apply(i:Int) = throw exceptions.maps.CannotTraverseBySeqException(this)
-    override def apply() = throw exceptions.aggregates.CannotTerminateException(this)
+    override def apply(i:String) = rawvalue.get(i)
+    override def apply(i:Int) = throw exceptions.CannotTraverseBySeqException(this)
   }
 
 // this is not really extensible, so maybe I should make it more 'functional'
@@ -186,14 +175,8 @@ package collection {
     override val metadata:Metadata=None
   ) extends AggregateNode[T](rawvalue, metadata) {
 
-    override def apply(i:Int) = try {
-      rawvalue.apply(i)
-    } catch {
-      case e:IndexOutOfBoundsException => throw exceptions.sequences.IndexOutOfBoundsException(e, this)
-    }
-
-    override def apply(i:String) = throw exceptions.sequences.CannotTraverseByMapException(this)
-    override def apply() = throw exceptions.aggregates.CannotTerminateException(this)
+    override def apply(i:Int) = rawvalue.apply(i)
+    override def apply(i:String) = throw exceptions.CannotTraverseByMapException(this)
   }
 
 }
