@@ -1,4 +1,4 @@
-package org.shl
+package org.shl.scalapath
 
 import java.lang.{Integer => JInt, Float => JFloat, Long => JLong, Double => JDouble, Boolean => JBoolean, String => JString}
 import java.util.{Map => JMap, List => JList}
@@ -6,23 +6,31 @@ import scala.language.dynamics
 import scala.reflect.ClassTag
 import scala.collection.JavaConverters._
 
-package object scalapath {
 
-  implicit def convertToScalaPath[T <: Any :ClassTag](a:T):UnboundScalaPath = {
+import path._
+
+package object collection {
+
+  object implicits {
+    implicit def implictlyConvertToSemiStructure1[T <: Map[String, _] :ClassTag](a:T):SemiStructure = convertToSemiStructure(a)
+    implicit def implictlyConvertToSemiStructure2[T <: List[_] :ClassTag](a:T):SemiStructure = convertToSemiStructure(a)
+  }
+
+  private def convertToSemiStructure[T <: Any :ClassTag](a:T):SemiStructure = { // this handles 'any' so it's being hidden behind functions that understand types
 
     case class ForJMap(value: JMap[String, Any])
     case class ForJList(value: JList[Any])
 
-    def recurseMap(x:Map[String, Any]):UnboundScalaPath = {
-       MapNode(x.map { case (k, v) => (k, convertToScalaPath(v))})
+    def recurseMap(x:Map[String, Any]):SemiStructure = {
+       MapNode(x.map { case (k, v) => (k, convertToSemiStructure(v))})
     }
 
-    def recurseSeq(x:Seq[Any]): UnboundScalaPath = {
-      SeqNode(x.map{ e => convertToScalaPath(e)})
+    def recurseSeq(x:Seq[Any]): SemiStructure = {
+      SeqNode(x.map{ e => convertToSemiStructure(e)})
     }
 
     a match {
-      case x:UnboundScalaPath => x // idempotent case
+      case x:SemiStructure => x // idempotent case
 
       // happy happy scala land
       case x:String => StringNode(x)
@@ -51,53 +59,74 @@ package object scalapath {
   // implicit def convertAggregateNodeToMonad(n:AgregateNode):MonadOps
 
   type Metadata = Option[Set[Any]]
-  type UnboundScalaPath = ScalaPathNode[_]
-  type Path = UnboundScalaPath
+  type SemiStructure = SemiStructureNode[_]
+  type Bush = SemiStructure
 
+  object SemiStructureSelectionPath {
+   val defaultSelector:Selector[Any] = {
+     (i: Any, entries: List[PathEntry]) => i match {
+       case i:String => entries :+ StringSelectorNode(i)
+       case i:Symbol => entries :+ StringSelectorNode(i.name)
+       case i:Int    => entries :+ IntSelectorNode(i)
+     }
+   }
+   val defaultResolver:Resolver[SemiStructure] = { (entries:List[PathEntry]) =>
+     val head = entries.head.asInstanceOf[PathRootNode[SemiStructure]]
+     val root = head.root.asInstanceOf[SemiStructureNode[Any]]
+     entries.tail.foldLeft (root) { (node, selector) =>
+       val ret = selector match {
+         case StringSelectorNode(sel) => node(sel)
+         case IntSelectorNode(sel) => node(sel)
+       }
+       ret.asInstanceOf[SemiStructureNode[Any]]
+     }
+   }
+  }
+
+  implicit class SemiStructureSelectionPath
+  (val root: SemiStructure)
+  (implicit
+    val selector: Selector[Any] = SemiStructureSelectionPath.defaultSelector,
+    val resolver: Resolver[SemiStructure] = SemiStructureSelectionPath.defaultResolver
+    )
+  extends PathHeadOps[Any, SemiStructure]{
+    override def path = Path(List(PathRootNode(root)))(selector, resolver)
+  }
 }
 
-package scalapath {
+package collection {
 
-  class SelectionPath { ///?
-    final def / (i:String) = this(i)
-    final def / (i:Symbol) = this(i.name)
-    final def / (i:Int) = this(i)
 
-    final def ! () = this() // resolve the path
-  }
-
-  trait ScalaPathOps[T] {
-    def apply(i:String):UnboundScalaPath
-    def apply(i:Int):UnboundScalaPath
+  trait SemiStructureSelectors[T] {
+    def apply(i:String):SemiStructure
+    def apply(i:Int):SemiStructure
     def apply():T
-
-    final def / (i:String) = this(i)
-    final def / (i:Symbol) = this(i.name)
-    final def / (i:Int) = this(i)
-    final def ! () = this()
   }
-
-  trait ScalaPathModifierOps[T] {
-    def assign(o:T)
-    final def := (o:T) = this.assign(o)
-  }
+  //
+  // trait SemiStructureModifierOps[T] {
+  //   def assign(o:T)
+  //   final def := (o:T) = this.assign(o)
+  // }
 
 
   // it's mixed in to everything, but it's experimental, so isolated.
-  trait ScalaPathDynamicSelect[T] extends ScalaPathOps[T] with Dynamic {
+  trait SemiStructureDynamicSelect[T] extends SemiStructureSelectors[T] with Dynamic {
       def selectDynamic(i:String) = this(i)
   }
 
-  abstract class ScalaPathNode[T](
+  abstract class SemiStructureNode[T](
     val rawvalue:T,
     val metadata:Metadata=None
-  ) extends ScalaPathOps[T] with ScalaPathDynamicSelect[T]
+  ) extends SemiStructureSelectors[T] with SemiStructureDynamicSelect[T]
+
+
+  import exceptions._
 
   // atomic nodes
   abstract class AtomicNode[T](
     override val rawvalue:T,
     override val metadata:Metadata=None
-  ) extends ScalaPathNode[T](rawvalue, metadata) {
+  ) extends SemiStructureNode[T](rawvalue, metadata) {
     override def apply(i:String) = throw exceptions.atoms.CannotTraverseByMapException(this)
     override def apply(i:Int) = throw  exceptions.atoms.CannotTraverseBySeqException(this)
     override def apply() = rawvalue
@@ -138,24 +167,24 @@ package scalapath {
   abstract class AggregateNode[T](
     override val rawvalue:T,
     override val metadata:Metadata=None
-  ) extends ScalaPathNode[T](rawvalue, metadata)
+  ) extends SemiStructureNode[T](rawvalue, metadata)
 
-  case class MapNode[T <: Map[String, UnboundScalaPath]] (
+  case class MapNode[T <: Map[String, SemiStructure]] (
     override val rawvalue:T,
     override val metadata:Metadata=None
   )
-  extends ScalaPathNode[T](rawvalue, metadata) {
+  extends AggregateNode[T](rawvalue, metadata) {
 
     override def apply(i:String) = rawvalue.getOrElse(i, throw exceptions.maps.NoSuchElementException(i, this)) // maybe I should make this handle options
     override def apply(i:Int) = throw exceptions.maps.CannotTraverseBySeqException(this)
     override def apply() = throw exceptions.aggregates.CannotTerminateException(this)
   }
 
-
-  case class SeqNode[T <: Seq[UnboundScalaPath]](
+// this is not really extensible, so maybe I should make it more 'functional'
+  case class SeqNode[T <: Seq[SemiStructure]](
     override val rawvalue:T,
     override val metadata:Metadata=None
-  ) extends ScalaPathNode[T](rawvalue, metadata) {
+  ) extends AggregateNode[T](rawvalue, metadata) {
 
     override def apply(i:Int) = try {
       rawvalue.apply(i)
